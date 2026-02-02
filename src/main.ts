@@ -52,7 +52,7 @@ export default class QuickMoves extends Plugin {
 		const selectionStart = editor.getCursor("from");
 		selectionStart.ch = 0;
 		const selectionEnd = editor.getCursor("to");
-		editor.setSelection(selectionStart, selectionEnd);
+		selectionEnd.ch = editor.getLine(selectionEnd.line).length;
 		const selection = editor.getRange(selectionStart, selectionEnd);
 
 		// Process each line in the selection
