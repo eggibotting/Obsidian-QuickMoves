@@ -1,99 +1,81 @@
-import {App, Editor, MarkdownView, Modal, Notice, Plugin} from 'obsidian';
-import {DEFAULT_SETTINGS, MyPluginSettings, SampleSettingTab} from "./settings";
+import { Editor, MarkdownView, Plugin } from "obsidian";
 
-// Remember to rename these classes and interfaces!
-
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
-
+export default class QuickMoves extends Plugin {
 	async onload() {
-		await this.loadSettings();
-
-		// This creates an icon in the left ribbon.
-		this.addRibbonIcon('dice', 'Sample', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
-		});
-
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status bar text');
-
-		// This adds a simple command that can be triggered anywhere
 		this.addCommand({
-			id: 'open-modal-simple',
-			name: 'Open modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			}
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'replace-selected',
-			name: 'Replace selected content',
+			id: "jump-relative-lines-down",
+			name: "Jump down by 5 lines relative to the cursor",
 			editorCallback: (editor: Editor, view: MarkdownView) => {
-				editor.replaceSelection('Sample editor command');
-			}
+				this.jumpRelativeLines(editor, 5);
+			},
 		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
+
 		this.addCommand({
-			id: 'open-modal-complex',
-			name: 'Open modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
+			id: "jump-relative-lines-up",
+			name: "Jump up by 5 lines relative to the cursor",
+			editorCallback: (editor: Editor, view: MarkdownView) => {
+				this.jumpRelativeLines(editor, -5);
+			},
+		});
 
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
-				return false;
+		this.addCommand({
+			id: "decrease-headline-level",
+			name: "Decrease headline level of selection",
+			editorCallback: (editor: Editor, view: MarkdownView) => {
+				this.adjustHeadlineLevel(editor, -1);
+			},
+		});
+
+		this.addCommand({
+			id: "increase-headline-level",
+			name: "Increase headline level of selection",
+			editorCallback: (editor: Editor, view: MarkdownView) => {
+				this.adjustHeadlineLevel(editor, 1);
+			},
+		});
+	}
+
+	onunload() {}
+
+	jumpRelativeLines(editor: Editor, lineOffset: number) {
+		const cursor = editor.getCursor();
+		const newLine = cursor.line + lineOffset;
+		const lineCount = editor.lineCount();
+		editor.setCursor(
+			Math.min(Math.max(newLine, 0), lineCount - 1),
+			cursor.ch,
+		);
+	}
+
+	adjustHeadlineLevel(editor: Editor, levelChange: number) {
+		// Get the current selection (using this to handle mid-line selections)
+		const selectionStart = editor.getCursor("from");
+		selectionStart.ch = 0;
+		const selectionEnd = editor.getCursor("to");
+		editor.setSelection(selectionStart, selectionEnd);
+		const selection = editor.getRange(selectionStart, selectionEnd);
+
+		// Process each line in the selection
+		const lines = selection.split("\n");
+		const adjustedLines = lines.map((line) => {
+			const match = line.match(/^(#{1,6})\s+/);
+			if (match) {
+				let currentLevel = match[1]!.length;
+				let newLevel = Math.min(
+					Math.max(currentLevel + levelChange, 1),
+					6,
+				);
+				return line.replace(/^(#{1,6})/, "#".repeat(newLevel));
+			} else {
+				return line;
 			}
 		});
 
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			new Notice("Click");
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
-
-	}
-
-	onunload() {
-	}
-
-	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<MyPluginSettings>);
-	}
-
-	async saveSettings() {
-		await this.saveData(this.settings);
-	}
-}
-
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
-
-	onOpen() {
-		let {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
-
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
+		// Replace selection and restore selection for follow-up adjustments
+		editor.replaceRange(
+			adjustedLines.join("\n"),
+			selectionStart,
+			selectionEnd,
+		);
 	}
 }
