@@ -49,10 +49,16 @@ export default class QuickMoves extends Plugin {
 
 	adjustHeadlineLevel(editor: Editor, levelChange: number) {
 		// Get the current selection (using this to handle mid-line selections)
-		const selectionStart = editor.getCursor("from");
-		selectionStart.ch = 0;
-		const selectionEnd = editor.getCursor("to");
-		selectionEnd.ch = editor.getLine(selectionEnd.line).length;
+		const cursorStart = editor.getCursor("from");
+		const selectionStart = {
+			line: cursorStart.line,
+			ch: 0,
+		};
+		const cursorEnd = editor.getCursor("to");
+		const selectionEnd = {
+			line: cursorEnd.line,
+			ch: editor.getLine(cursorEnd.line).length,
+		};
 		const selection = editor.getRange(selectionStart, selectionEnd);
 
 		// Process each line in the selection
@@ -77,5 +83,6 @@ export default class QuickMoves extends Plugin {
 			selectionStart,
 			selectionEnd,
 		);
+		editor.setSelection(cursorStart, cursorEnd);
 	}
 }
